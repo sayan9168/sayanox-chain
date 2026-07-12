@@ -2,26 +2,51 @@ package main
 
 import (
 	"fmt"
+	"log"
 
-	"github.com/sayan9168/sayanox-chain/core"
+	"github.com/sayan9168/sayanox-chain/configs"
+	"github.com/sayan9168/sayanox-chain/internal/blockchain"
+	"github.com/sayan9168/sayanox-chain/internal/network"
+	"github.com/sayan9168/sayanox-chain/internal/rpc"
 )
 
 func main() {
-	// Create blockchain
-	bc := core.NewBlockchain()
 
-	// Add sample blocks
-	bc.AddBlock([]string{"Alice -> Bob : 10 SAYX"})
-	bc.AddBlock([]string{"Bob -> Charlie : 5 SAYX"})
+	config := configs.DefaultConfig()
 
-	fmt.Println("=== Sayanox Chain ===")
+	fmt.Println(
+		"Starting",
+		config.NetworkName,
+		config.Version,
+	)
 
-	for _, block := range bc.Blocks {
-		fmt.Println("---------------------------")
-		fmt.Printf("Index: %d\n", block.Index)
-		fmt.Printf("Timestamp: %d\n", block.Timestamp)
-		fmt.Printf("Previous Hash: %s\n", block.PreviousHash)
-		fmt.Printf("Hash: %s\n", block.Hash)
-		fmt.Printf("Transactions: %v\n", block.Transactions)
+	chain := blockchain.NewChain()
+
+	networkServer := network.NewServer(
+		"0.0.0.0",
+		config.P2PPort,
+	)
+
+	rpcServer := rpc.NewServer(
+		chain,
+		fmt.Sprintf(":%d", config.RPCPort),
+	)
+
+	go func() {
+
+		err := networkServer.Start()
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	}()
+
+	fmt.Println("RPC server running...")
+
+	err := rpcServer.Start()
+
+	if err != nil {
+		log.Fatal(err)
 	}
 }
