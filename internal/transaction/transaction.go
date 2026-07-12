@@ -14,6 +14,9 @@ type Transaction struct {
 	Fee       *Amount
 	Timestamp int64
 	Hash      string
+
+        Signature string
+        PublicKey string
 }
 
 func NewTransaction(from, to string, amount, fee *Amount) *Transaction {
