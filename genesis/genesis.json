@@ -1,0 +1,10 @@
+{
+  "chain_id": "sayanox-mainnet",
+  "network_name": "Sayanox Chain",
+  "version": "v0.1.0-alpha",
+  "genesis_time": "2026-07-12T00:00:00Z",
+  "initial_supply": 1000000000,
+  "symbol": "SAYX",
+  "decimals": 18,
+  "validators": []
+}
