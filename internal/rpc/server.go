@@ -1,15 +1,18 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/sayan9168/sayanox-chain/internal/blockchain"
 )
 
 type Server struct {
-	Chain *blockchain.Chain
-	Port  string
+	Chain      *blockchain.Chain
+	Port       string
+	httpServer *http.Server
 }
 
 func NewServer(chain *blockchain.Chain, port string) *Server {
@@ -19,15 +22,45 @@ func NewServer(chain *blockchain.Chain, port string) *Server {
 	}
 }
 
-func (s *Server) Start() error {
+func (s *Server) Name() string {
+	return "rpc"
+}
 
-	http.HandleFunc("/status", s.statusHandler)
-	http.HandleFunc("/height", s.heightHandler)
+func (s *Server) Start(ctx context.Context) error {
 
-	return http.ListenAndServe(
-		s.Port,
-		nil,
-	)
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/status", s.statusHandler)
+	mux.HandleFunc("/height", s.heightHandler)
+
+	s.httpServer = &http.Server{
+		Addr:    s.Port,
+		Handler: mux,
+	}
+
+	fmt.Println("RPC server running on", s.Port)
+
+	go func() {
+		<-ctx.Done()
+		_ = s.httpServer.Shutdown(context.Background())
+	}()
+
+	err := s.httpServer.ListenAndServe()
+
+	if err == http.ErrServerClosed {
+		return nil
+	}
+
+	return err
+}
+
+func (s *Server) Stop(ctx context.Context) error {
+
+	if s.httpServer != nil {
+		return s.httpServer.Shutdown(ctx)
+	}
+
+	return nil
 }
 
 func (s *Server) statusHandler(
@@ -40,7 +73,7 @@ func (s *Server) statusHandler(
 		"status":  "running",
 	}
 
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) heightHandler(
@@ -52,5 +85,5 @@ func (s *Server) heightHandler(
 		"height": s.Chain.GetHeight(),
 	}
 
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }

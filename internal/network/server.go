@@ -1,13 +1,15 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 )
 
 type Server struct {
-	Host string
-	Port int
+	Host     string
+	Port     int
+	listener net.Listener
 }
 
 func NewServer(host string, port int) *Server {
@@ -17,47 +19,59 @@ func NewServer(host string, port int) *Server {
 	}
 }
 
-func (s *Server) Start() error {
+func (s *Server) Name() string {
+	return "network"
+}
 
-	address := fmt.Sprintf(
-		"%s:%d",
-		s.Host,
-		s.Port,
-	)
+func (s *Server) Start(ctx context.Context) error {
+	address := fmt.Sprintf("%s:%d", s.Host, s.Port)
 
-	listener, err := net.Listen(
-		"tcp",
-		address,
-	)
-
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
 
-	defer listener.Close()
+	s.listener = listener
 
-	fmt.Println(
-		"Sayanox node listening on",
-		address,
-	)
+	fmt.Println("Sayanox node listening on", address)
+
+	go func() {
+		<-ctx.Done()
+		_ = listener.Close()
+	}()
 
 	for {
 		conn, err := listener.Accept()
-
 		if err != nil {
-			continue
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+				continue
+			}
 		}
 
 		go handleConnection(conn)
 	}
 }
 
-func handleConnection(conn net.Conn) {
+func (s *Server) Stop(ctx context.Context) error {
+	if s.listener != nil {
+		return s.listener.Close()
+	}
+	return nil
+}
 
+func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	fmt.Println(
-		"New peer connected:",
-		conn.RemoteAddr(),
-	)
+	fmt.Println("New peer connected:", conn.RemoteAddr())
+
+	// TODO:
+	// - Handshake
+	// - Version exchange
+	// - Peer authentication
+	// - Message decoding
+	// - Block sync
+	// - Transaction sync
 }

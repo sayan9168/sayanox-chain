@@ -1,52 +1,39 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/sayan9168/sayanox-chain/configs"
-	"github.com/sayan9168/sayanox-chain/internal/blockchain"
-	"github.com/sayan9168/sayanox-chain/internal/network"
-	"github.com/sayan9168/sayanox-chain/internal/rpc"
+	"github.com/sayan9168/sayanox-chain/internal/app"
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	config := configs.DefaultConfig()
-
-	fmt.Println(
-		"Starting",
-		config.NetworkName,
-		config.Version,
-	)
-
-	chain := blockchain.NewChain()
-
-	networkServer := network.NewServer(
-		"0.0.0.0",
-		config.P2PPort,
-	)
-
-	rpcServer := rpc.NewServer(
-		chain,
-		fmt.Sprintf(":%d", config.RPCPort),
-	)
+	a := app.New()
 
 	go func() {
-
-		err := networkServer.Start()
-
-		if err != nil {
-			log.Fatal(err)
+		if err := a.Start(ctx); err != nil {
+			log.Fatalf("failed to start app: %v", err)
 		}
-
 	}()
 
-	fmt.Println("RPC server running...")
+	log.Println("Sayanox Chain started")
 
-	err := rpcServer.Start()
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-	if err != nil {
-		log.Fatal(err)
+	<-sigCh
+
+	log.Println("Shutting down Sayanox Chain...")
+
+	if err := a.Stop(ctx); err != nil {
+		log.Printf("shutdown error: %v", err)
 	}
+
+	log.Println("Node stopped")
 }
