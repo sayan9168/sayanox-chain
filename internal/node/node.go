@@ -1,43 +1,39 @@
 package node
 
 import (
-	"fmt"
+	"context"
 
-	"github.com/sayan9168/sayanox-chain/internal/blockchain"
-	"github.com/sayan9168/sayanox-chain/internal/consensus"
-	"github.com/sayan9168/sayanox-chain/internal/network"
-	"github.com/sayan9168/sayanox-chain/internal/rpc"
+	"github.com/sayan9168/sayanox-chain/internal/service"
 )
 
 type Node struct {
-	Chain     *blockchain.Chain
-	Consensus *consensus.Engine
-	Network   *network.Server
-	RPC       *rpc.Server
+	services []service.Service
 }
 
-func NewNode(
-	chain *blockchain.Chain,
-	consensus *consensus.Engine,
-	network *network.Server,
-	rpcServer *rpc.Server,
-) *Node {
-
+func New() *Node {
 	return &Node{
-		Chain:     chain,
-		Consensus: consensus,
-		Network:   network,
-		RPC:       rpcServer,
+		services: make([]service.Service, 0),
 	}
 }
 
-func (n *Node) Start() error {
+func (n *Node) Register(s service.Service) {
+	n.services = append(n.services, s)
+}
 
-	go func() {
-		if err := n.Network.Start(); err != nil {
-			fmt.Println("Network error:", err)
+func (n *Node) Start(ctx context.Context) error {
+	for _, s := range n.services {
+		if err := s.Start(ctx); err != nil {
+			return err
 		}
-	}()
+	}
+	return nil
+}
 
-	return n.RPC.Start()
+func (n *Node) Stop(ctx context.Context) error {
+	for i := len(n.services) - 1; i >= 0; i-- {
+		if err := n.services[i].Stop(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
