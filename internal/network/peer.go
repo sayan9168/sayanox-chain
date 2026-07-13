@@ -6,9 +6,9 @@ import (
 )
 
 type Peer struct {
-	ID        string
-	Address   string
-	LastSeen  time.Time
+	ID       string
+	Address  string
+	LastSeen time.Time
 }
 
 type PeerManager struct {

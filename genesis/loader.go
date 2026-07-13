@@ -6,14 +6,14 @@ import (
 )
 
 type Genesis struct {
-	ChainID      string `json:"chain_id"`
-	NetworkName  string `json:"network_name"`
-	Version      string `json:"version"`
-	GenesisTime  string `json:"genesis_time"`
-	InitialSupply uint64 `json:"initial_supply"`
-	Symbol       string `json:"symbol"`
-	Decimals     uint8  `json:"decimals"`
-	Validators   []string `json:"validators"`
+	ChainID       string   `json:"chain_id"`
+	NetworkName   string   `json:"network_name"`
+	Version       string   `json:"version"`
+	GenesisTime   string   `json:"genesis_time"`
+	InitialSupply uint64   `json:"initial_supply"`
+	Symbol        string   `json:"symbol"`
+	Decimals      uint8    `json:"decimals"`
+	Validators    []string `json:"validators"`
 }
 
 func LoadGenesis(path string) (*Genesis, error) {
