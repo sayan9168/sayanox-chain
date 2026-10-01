@@ -22,7 +22,7 @@ jobs:
           cache: true
 
       - name: Format
-        run: go fmt ./...
+        run: gofmt -w .
 
       - name: Vet
         run: go vet ./...
@@ -32,3 +32,6 @@ jobs:
 
       - name: Race
         run: go test -race ./...
+
+      - name: Build
+        run: go build ./cmd/sayanoxd
