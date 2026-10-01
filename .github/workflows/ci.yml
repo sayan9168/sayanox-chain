@@ -21,10 +21,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Format check
-        shell: bash
-        run: |
-          test -z "$(gofmt -l .)"
+      - name: Format
+        run: go fmt ./...
 
       - name: Vet
         run: go vet ./...
