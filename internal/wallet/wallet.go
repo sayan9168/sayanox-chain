@@ -28,6 +28,8 @@ func (w *Wallet) Address() string {
 	return AddressPrefix + hex.EncodeToString(sum[:20])
 }
 
+func NewAddressForTest() string { return "sx1test0000000000000000000000000000000000" }
+
 func AddressFromPublicKey(publicKey ed25519.PublicKey) (string, error) {
 	if len(publicKey) != ed25519.PublicKeySize {
 		return "", errors.New("invalid public key length")

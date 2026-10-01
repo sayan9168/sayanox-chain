@@ -20,7 +20,7 @@ func TestTransactionSignAndVerify(t *testing.T) {
 		t.Fatal("failed to create fee")
 	}
 
-	tx, err := NewSignedTransaction(w, "sx1recipient", amount, fee, 1)
+	tx, err := NewSignedTransaction(w, wallet.NewAddressForTest(), amount, fee, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,8 +44,8 @@ func TestHashChangesWithNonce(t *testing.T) {
 	}
 	amount, _ := NewAmount("1")
 	fee, _ := NewAmount("0")
-	tx1, _ := NewSignedTransaction(w, "sx1recipient", amount, fee, 1)
-	tx2, _ := NewSignedTransaction(w, "sx1recipient", amount, fee, 2)
+	tx1, _ := NewSignedTransaction(w, wallet.NewAddressForTest(), amount, fee, 1)
+	tx2, _ := NewSignedTransaction(w, wallet.NewAddressForTest(), amount, fee, 2)
 	if tx1.Hash == tx2.Hash {
 		t.Fatal("nonce must affect transaction hash")
 	}
