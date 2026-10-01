@@ -14,11 +14,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	a := app.New()
+	a, err := app.New()
+	if err != nil {
+		log.Fatalf("failed to initialize app: %v", err)
+	}
 
 	go func() {
 		if err := a.Start(ctx); err != nil {
-			log.Fatalf("failed to start app: %v", err)
+			log.Printf("failed to start app: %v", err)
+			cancel()
 		}
 	}()
 
@@ -26,12 +30,15 @@ func main() {
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
 
-	<-sigCh
+	select {
+	case <-sigCh:
+		log.Println("Shutting down Sayanox Chain...")
+	case <-ctx.Done():
+	}
 
-	log.Println("Shutting down Sayanox Chain...")
-
-	if err := a.Stop(ctx); err != nil {
+	if err := a.Stop(context.Background()); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
 

@@ -14,7 +14,7 @@ type Account struct {
 }
 
 type State struct {
-	Accounts map[string]*Account
+	Accounts map[string]*Account `json:"accounts"`
 	mu       sync.RWMutex
 }
 
@@ -25,7 +25,13 @@ func NewState() *State {
 func (s *State) CreateAccount(address string, balance *big.Int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.Accounts[address] = &Account{Address: address, Balance: new(big.Int).Set(balance)}
+	if balance == nil {
+		balance = new(big.Int)
+	}
+	s.Accounts[address] = &Account{
+		Address: address,
+		Balance: new(big.Int).Set(balance),
+	}
 }
 
 func (s *State) GetBalance(address string) *big.Int {
@@ -33,61 +39,79 @@ func (s *State) GetBalance(address string) *big.Int {
 	defer s.mu.RUnlock()
 	account, exists := s.Accounts[address]
 	if !exists || account.Balance == nil {
-		return big.NewInt(0)
+		return new(big.Int)
 	}
 	return new(big.Int).Set(account.Balance)
 }
 
-func (s *State) ValidateTransfer(tx *transaction.Transaction) error {
-	if tx == nil || tx.Amount == nil || tx.Fee == nil {
-		return errors.New("invalid transaction")
-	}
+func (s *State) SetAccounts(accounts map[string]*Account) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Accounts = cloneAccounts(accounts)
+}
+
+func (s *State) SnapshotAccounts() map[string]*Account {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	sender, exists := s.Accounts[tx.From]
-	if !exists {
-		return errors.New("sender account not found")
+	return cloneAccounts(s.Accounts)
+}
+
+func (s *State) ValidateTransactions(txs []*transaction.Transaction) error {
+	_, err := s.Project(txs)
+	return err
+}
+
+func (s *State) Project(txs []*transaction.Transaction) (*State, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	accounts := cloneAccounts(s.Accounts)
+	for _, tx := range txs {
+		if err := transaction.Validate(tx); err != nil {
+			return nil, err
+		}
+		if err := validateTransfer(tx, accounts); err != nil {
+			return nil, err
+		}
+		applyTransfer(accounts, tx)
 	}
-	total := new(big.Int).Add(tx.Amount.Value, tx.Fee.Value)
-	if sender.Balance.Cmp(total) < 0 {
-		return errors.New("insufficient balance")
+
+	return &State{Accounts: accounts}, nil
+}
+
+func (s *State) ApplyTransactions(txs []*transaction.Transaction) error {
+	next, err := s.Project(txs)
+	if err != nil {
+		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Accounts = next.Accounts
 	return nil
 }
 
 func (s *State) Transfer(tx *transaction.Transaction) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return transferLocked(s.Accounts, tx)
-}
-
-func (s *State) ApplyTransactions(txs []*transaction.Transaction) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	next := cloneAccounts(s.Accounts)
-	for _, tx := range txs {
-		if err := transferLocked(next, tx); err != nil {
-			return err
-		}
-	}
-	s.Accounts = next
-	return nil
+	return s.ApplyTransactions([]*transaction.Transaction{tx})
 }
 
 func cloneAccounts(src map[string]*Account) map[string]*Account {
 	dst := make(map[string]*Account, len(src))
 	for address, account := range src {
+		balance := new(big.Int)
+		if account != nil && account.Balance != nil {
+			balance.Set(account.Balance)
+		}
 		dst[address] = &Account{
-			Address: account.Address,
-			Balance: new(big.Int).Set(account.Balance),
+			Address: address,
+			Balance: balance,
 		}
 	}
 	return dst
 }
 
-func transferLocked(accounts map[string]*Account, tx *transaction.Transaction) error {
-	if tx == nil || tx.Amount == nil || tx.Fee == nil {
+func validateTransfer(tx *transaction.Transaction, accounts map[string]*Account) error {
+	if tx == nil || tx.Amount == nil || tx.Fee == nil ||
+		tx.Amount.Value == nil || tx.Fee.Value == nil {
 		return errors.New("invalid transaction")
 	}
 	sender, exists := accounts[tx.From]
@@ -98,12 +122,17 @@ func transferLocked(accounts map[string]*Account, tx *transaction.Transaction) e
 	if sender.Balance.Cmp(total) < 0 {
 		return errors.New("insufficient balance")
 	}
+	return nil
+}
+
+func applyTransfer(accounts map[string]*Account, tx *transaction.Transaction) {
+	total := new(big.Int).Add(tx.Amount.Value, tx.Fee.Value)
+	sender := accounts[tx.From]
 	receiver, exists := accounts[tx.To]
 	if !exists {
-		receiver = &Account{Address: tx.To, Balance: big.NewInt(0)}
+		receiver = &Account{Address: tx.To, Balance: new(big.Int)}
 		accounts[tx.To] = receiver
 	}
 	sender.Balance.Sub(sender.Balance, total)
 	receiver.Balance.Add(receiver.Balance, tx.Amount.Value)
-	return nil
 }
