@@ -23,6 +23,7 @@ func New() *App {
 	pool := mempool.NewMempool()
 
 	networkServer := network.NewServer("0.0.0.0", cfg.P2PPort)
+	networkServer.ChainID = cfg.ChainID
 	rpcServer := rpc.NewServer(chain, pool, fmt.Sprintf(":%d", cfg.RPCPort))
 
 	n := node.New()
