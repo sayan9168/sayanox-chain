@@ -11,7 +11,6 @@ import (
 type Chain struct {
 	Blocks []*Block
 	State  *state.State
-	store  PersistentStore
 	mu     sync.RWMutex
 }
 
@@ -22,57 +21,11 @@ func NewChain() *Chain {
 	}
 }
 
-func NewPersistentChain(store PersistentStore) (*Chain, error) {
-	blocks, err := store.LoadBlocks()
-	if err != nil {
-		return nil, err
-	}
-
-	chain := &Chain{
-		Blocks: blocks,
-		State:  state.NewState(),
-		store:  store,
-	}
-
-	if len(chain.Blocks) == 0 {
-		chain.Blocks = []*Block{NewGenesisBlock()}
-		if err := store.Commit(chain.Blocks[0], chain.State); err != nil {
-			return nil, err
-		}
-	} else {
-		for i, block := range chain.Blocks {
-			var previous *Block
-			if i > 0 {
-				previous = chain.Blocks[i-1]
-			}
-			if err := block.Validate(previous); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	if err := store.LoadState(chain.State); err != nil {
-		return nil, err
-	}
-
-	return chain, nil
-}
-
 func (c *Chain) AddTransaction(tx *transaction.Transaction) error {
 	if err := transaction.Validate(tx); err != nil {
 		return err
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	for _, block := range c.Blocks {
-		for _, existing := range block.Transactions {
-			if existing.Hash == tx.Hash {
-				return errors.New("duplicate transaction")
-			}
-		}
-	}
-	return c.State.ValidateTransactions([]*transaction.Transaction{tx})
+	return c.State.Transfer(tx)
 }
 
 func (c *Chain) AddBlock(block *Block) error {
@@ -87,19 +40,9 @@ func (c *Chain) AddBlock(block *Block) error {
 	if err := block.Validate(previous); err != nil {
 		return err
 	}
-
-	nextState, err := c.State.Project(block.Transactions)
-	if err != nil {
+	if err := c.State.ApplyTransactions(block.Transactions); err != nil {
 		return err
 	}
-
-	if c.store != nil {
-		if err := c.store.Commit(block, nextState); err != nil {
-			return err
-		}
-	}
-
-	c.State = nextState
 	c.Blocks = append(c.Blocks, block)
 	return nil
 }
