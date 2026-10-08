@@ -1,8 +1,8 @@
 package consensus
 
 import (
+	"bytes"
 	"crypto/ed25519"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -23,14 +23,10 @@ func (e *Engine) Proposer(previous *blockchain.Block) (*Validator, error) {
 	if e == nil || e.PoS == nil {
 		return nil, errors.New("consensus engine not configured")
 	}
-	if previous == nil {
-		return nil, errors.New("previous block is nil")
-	}
-	hash, err := hex.DecodeString(previous.Hash)
+	seed, err := ProposerSeed(previous)
 	if err != nil {
-		return nil, errors.New("invalid previous block hash")
+		return nil, err
 	}
-	seed := new(big.Int).SetBytes(hash)
 	return e.PoS.SelectValidator(seed)
 }
 
@@ -60,9 +56,10 @@ func (e *Engine) ValidateBlock(block *blockchain.Block, previous *blockchain.Blo
 	if err != nil || len(publicKey) != ed25519.PublicKeySize {
 		return errors.New("invalid proposer public key")
 	}
-	if expected.PublicKey != nil && !ed25519.PublicKey(expected.PublicKey).Equal(ed25519.PublicKey(publicKey)) {
+	if len(expected.PublicKey) != 0 && !bytes.Equal(expected.PublicKey, publicKey) {
 		return errors.New("proposer public key mismatch")
 	}
+
 	address, err := wallet.AddressFromPublicKey(ed25519.PublicKey(publicKey))
 	if err != nil || address != block.Proposer {
 		return errors.New("proposer address mismatch")
@@ -72,8 +69,7 @@ func (e *Engine) ValidateBlock(block *blockchain.Block, previous *blockchain.Blo
 	if err != nil || len(signature) != ed25519.SignatureSize {
 		return errors.New("invalid proposer signature")
 	}
-	digest := block.SigningHash()
-	if !ed25519.Verify(ed25519.PublicKey(publicKey), []byte(digest), signature) {
+	if !ed25519.Verify(ed25519.PublicKey(publicKey), []byte(block.SigningHash()), signature) {
 		return errors.New("invalid proposer signature")
 	}
 	return nil
@@ -83,6 +79,9 @@ func ProposerSeed(previous *blockchain.Block) (*big.Int, error) {
 	if previous == nil {
 		return nil, errors.New("previous block is nil")
 	}
-	sum := sha256.Sum256([]byte(previous.Hash))
-	return new(big.Int).SetBytes(sum[:]), nil
+	hash, err := hex.DecodeString(previous.Hash)
+	if err != nil || len(hash) == 0 {
+		return nil, errors.New("invalid previous block hash")
+	}
+	return new(big.Int).SetBytes(hash), nil
 }
