@@ -28,7 +28,7 @@ func TestBlockProposerSignature(t *testing.T) {
 	w := &wallet.Wallet{PublicKey: pub, PrivateKey: priv}
 	previous := blockchain.NewGenesisBlock()
 	engine := NewEngine()
-	engine.PoS.AddValidator(w.Address(), big.NewInt(100), pub)
+	engine.PoS.AddValidatorWithKey(w.Address(), big.NewInt(100), pub)
 
 	block := blockchain.NewBlock(1, previous.Hash, nil)
 	// Force the deterministic validator for this test by using the actual proposer check.
